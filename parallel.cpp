@@ -19,7 +19,6 @@ int main()
 	//五级流水
 	while (1)
 	{
-
 		RD.Check_And_Renew(id_end);
 		RD.Check_And_Renew(if_end);
 

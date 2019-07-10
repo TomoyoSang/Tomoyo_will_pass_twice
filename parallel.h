@@ -88,7 +88,6 @@ public:
 	unsigned int instruction = 0u;
 	unsigned int result = 0u;
 	int tmp = 0u;
-	//bool checked = 0;
 	int Pred_PC = 0u;
 	int Real_PC = 0u;
 	int jump_PC = 0u;
@@ -97,6 +96,29 @@ public:
 
 	pass_oj() {};
 	~pass_oj() {};
+	pass_oj operator=(const pass_oj &oj)
+	{
+		inst_name = oj.inst_name;
+		imm = oj.imm;
+		opcode = oj.opcode;
+		rd = oj.rd;
+		rs1 = oj.rs1;
+		rs1_value = oj.rs1_value;
+		rs2 = oj.rs2;
+		rs2_value = oj.rs2_value;
+		func3 = oj.func3;
+		func7 = oj.func7;
+		shamt = oj.shamt;
+		instruction = oj.instruction;
+		result = oj.result;
+		tmp = oj.tmp;
+		Pred_PC = oj.Pred_PC;
+		Real_PC = oj.Real_PC;
+		jump_PC = oj.jump_PC;
+		no_jump_PC = oj.no_jump_PC;
+		cur_PC = oj.cur_PC;
+		return *this;
+	}
 
 };
 
@@ -109,7 +131,6 @@ pass_oj reset()
 	return zero_status;
 }
 void reset(pass_oj &cleaner)
-
 {
 	if (!(cleaner.inst_name == ZERO))
 	{
@@ -127,6 +148,11 @@ void reset(pass_oj &cleaner)
 		cleaner.instruction = 0u;
 		cleaner.result = 0u;
 		cleaner.tmp = 0u;
+		cleaner.Pred_PC = 0u;
+		cleaner.Real_PC = 0u;
+		cleaner.jump_PC = 0u;
+		cleaner.no_jump_PC = 0u;
+		cleaner.cur_PC = 0u;
 	};
 	return;
 
@@ -222,7 +248,6 @@ public:
 	~InterMem() {};
 };
 
-//五级流水细节结构
 class RD_Renew
 {
 public:
@@ -245,12 +270,10 @@ public:
 		if (id_end.rs1 == cur_RD.rd&&id_end.rs1 != 0)
 		{
 			id_end.rs1_value = cur_RD.rd_value;
-			//id_end.checked = 1;
 		}
 		if (id_end.rs2 == cur_RD.rd&&id_end.rs2 != 0)
 		{
 			id_end.rs2_value = cur_RD.rd_value;
-			//id_end.checked = 1;
 		}
 		return;
 	}
@@ -269,6 +292,8 @@ public:
 RD_Renew RD;
 
 int wait_time = 0;
+
+//----------------------------分支预测-------------------------**
 int if_jump = 1;
 
 int Pred_True = 0;
@@ -281,10 +306,9 @@ int Guess(int jump, int no_jump)
 	return no_jump;
 }
 
-
 void FeedBack(int &if_jump,pass_oj &ex_end,pass_oj &id_end,pass_oj &if_end)
 {
-	if (ex_end.Pred_PC != ex_end.Real_PC)
+	if (ex_end.inst_name!=ZERO&&ex_end.Pred_PC != ex_end.Real_PC)
 	{
 		Pred_False++;
 		if (ex_end.Pred_PC == ex_end.jump_PC)
@@ -298,7 +322,7 @@ void FeedBack(int &if_jump,pass_oj &ex_end,pass_oj &id_end,pass_oj &if_end)
 		reset(id_end);
 		reset(if_end);
 	}
-	else
+	else if(ex_end.inst_name != ZERO)
 	{
 		Pred_True++;
 	}
@@ -679,7 +703,7 @@ public:
 		//U_Type 2******
 		case LUI:
 		{
-			execution_end.result = (execution_end.imm >> 12 << 12);
+			execution_end.result = (execution_end.imm );
 			RD.cur_RD.rd = execution_end.rd;
 			RD.cur_RD.rd_value = execution_end.result;
 			break;
@@ -704,7 +728,6 @@ public:
 
 //-------------------------------     Decode     过程------------------------**
 
-//新增：bool checked
 class Instruction_Decode
 {
 public:
@@ -759,7 +782,6 @@ public:
 	{
 		instruction = (im.Memery[PC + 3] << 24) + (im.Memery[PC + 2] << 16)
 				+ (im.Memery[PC + 1] << 8) + im.Memery[PC];
-
 		PC += 4;
 		return;
 	}
@@ -786,6 +808,7 @@ public:
 		unsigned int func7 = (tmp & 127);
 
 		pass_oj fetch_end;
+		fetch_end.cur_PC = PC - 4;
 		fetch_end.rd = rd;
 		fetch_end.rd = rs1;
 		fetch_end.rd = rs2;
@@ -815,6 +838,7 @@ public:
 		unsigned int opcode = (tmp & 127);
 		tmp = (tmp >> 7);
 		pass_oj fetch_end ;
+		fetch_end.cur_PC = PC - 4;
 
 		if (opcode == 3)
 		{
@@ -964,7 +988,7 @@ public:
 			fetch_end.imm = imm;
 			fetch_end.inst_name = JAL;
 
-			fetch_end.result = PC;
+			fetch_end.result = fetch_end.cur_PC + 4;
 
 			reg.Register[fetch_end.rd] = fetch_end.result;
 
@@ -1001,6 +1025,7 @@ public:
 		int imm = (((tmp & 0xfffff) << 12)&(0xffffffff >> 12 << 12));
 
 		pass_oj fetch_end;
+		fetch_end.cur_PC = PC - 4;
 		if (opcode == 55)
 		{
 			fetch_end.rd = rd;
@@ -1039,6 +1064,7 @@ public:
 		unsigned int imm2 = (tmp & 127);
 
 		pass_oj fetch_end;
+		fetch_end.cur_PC = PC - 4;
 		if (opcode == 99)
 		{
 			unsigned int imm0 = 0;
@@ -1098,8 +1124,6 @@ public:
 		pass_oj fetch_end;
 		Fetch(im);
 		fetch_end.opcode = (instruction & 127);
-
-		fetch_end.cur_PC = PC - 4;
 
 		switch (fetch_end.opcode)
 		{
