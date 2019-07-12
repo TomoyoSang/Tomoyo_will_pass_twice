@@ -12,61 +12,10 @@ enum Inst_Name {
 	LB, LH, LW, LBU, LHU, SB, SH, SW, ADDI, SLTI, SLTIU, XORI, ORI,
 	ANDI, SLLI, SRLI, SRAI, ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND, ZERO
 };
+
+
 //hopefully my file will be accepted 
 
-//--**--**--**--**--**--**--**
-
-//所有的bool型：true为锁上，false为未锁
-//处理器Control：存储当前各部分返回的指令
-//1/**PC_lock
-//******PC放在IF里，表示下一条要读取的指令位置
-//******当发现有跳转指令时，PC--pause 直到Ex运算结束给IF返回通知：infor_unlock_PC
-//2/**data hazard
-//******ID阶段：
-//*********1.判定锁：看rs1和rs2（如果有的话）是否被锁上
-//******************如果不够两个，则写成rs1，0的形式
-//***********若被锁上，则向control发出被锁的指令，control更改
-//*********2.上锁：如果无需等待，则向control进行上锁
-//******WB阶段：
-//*********解锁：向control传输已经结束的rd的值
-//**************由control进行解锁指令
-
-
-
-//等等，，，我们不要乱写，，跑出来一堆0死循环算是什么，，，，，
-//好的，以上注释全部作废，，程序里添加的也，，作废，，嘿嘿，，
-//Forwarding+分支预测
-//****Forwarding：：：
-//Forwarding只要把计算结果及时的返回给EX即可
-//最迟也可在本轮MA结束时知道结果，此时下一指令即将开始EX
-//因为是倒着写出来的，所以不影响EX的执行
-//唯一需要考虑load指令，取出来之后
-//Forwarding是否需要lock？
-//应该不需要吧？因为我只要把EX或MA计算结果返回给EX，EX看一下有没有重合的，这只需要考虑一个rd，，，
-//如果前面两条：ID和EX都需要更新，而此时的指令是load，那么好像是，，需要把load到的东西用结构体的形式传输给EX和ID，，，，
-//而如果此时是其他的在EX即可计算好的指令的话，，，直接更新后面的ID和自己EX（自己怎么跟自己传呢？）
-//emmm似乎可以这样看：每轮EX或MA（视指令类型有所不同，一切以result为准）结束时，
-//向controller上传自己计算的rd的值，之后ID立即调用contro的函数清除
-//对应的，每次EX和ID在获取寄存器时，都要先从controller获取一个数据结构体，判断自己是否要更新
-//Forwarding到此为止
-
-//那么分支预测呢？
-//分支预测应当是在IF读到跳转指令时进行的操作
-//跳转包括JAL，JALR，B_Type
-//其中JAL无条件跳转，不需要进行预测，，
-//
-
-
-
-
-//他喵的，，现在看，，我之前在想什么啊？？？
-//woc写完再过来吐槽之前的神奇脑洞吧啊哈哈哈，，，
-//“终有一日，现在的我们，也终将在未来成为某人手中的古典吧！”
-//未完待续。。
-
-
-//注意！！数据类型int /unsigned int？
-//。。。。。。。。。。。。。。
 
 //------------------------数据传输结构体：pass_oj-------------------**
 
@@ -77,22 +26,24 @@ public:
 	Inst_Name inst_name = ZERO;
 	int imm = 0u;
 	unsigned int opcode = 0u;
-	unsigned int rd = 0u;
-	unsigned int rs1 = 0u;
+	int rd = 0u;
+	int rs1 = 0u;
 	int rs1_value = 0u;
-	unsigned int rs2 = 0u;
+	int rs2 = 0u;
 	int rs2_value = 0u;
-	unsigned int func3 = 0u;
-	unsigned int func7 = 0u;
-	unsigned int shamt = 0u;
+	int func3 = 0u;
+	int func7 = 0u;
+	int shamt = 0u;
 	unsigned int instruction = 0u;
-	unsigned int result = 0u;
+	int result = 0u;
 	int tmp = 0u;
 	int Pred_PC = 0u;
 	int Real_PC = 0u;
 	int jump_PC = 0u;
 	int no_jump_PC = 0u;
 	int cur_PC = 0u;
+	bool checked_rs1 = 0;
+	bool checked_rs2 = 0;
 
 	pass_oj() {};
 	~pass_oj() {};
@@ -117,6 +68,8 @@ public:
 		jump_PC = oj.jump_PC;
 		no_jump_PC = oj.no_jump_PC;
 		cur_PC = oj.cur_PC;
+		checked_rs1 = oj.checked_rs1;
+		checked_rs2 = oj.checked_rs2;
 		return *this;
 	}
 
@@ -270,26 +223,36 @@ public:
 		if (id_end.rs1 == cur_RD.rd&&id_end.rs1 != 0)
 		{
 			id_end.rs1_value = cur_RD.rd_value;
+			id_end.checked_rs1 = 1;
 		}
 		if (id_end.rs2 == cur_RD.rd&&id_end.rs2 != 0)
 		{
 			id_end.rs2_value = cur_RD.rd_value;
+			id_end.checked_rs2 = 1;
 		}
 		return;
 	}
 
-	void update(pass_oj &ex_end)
-	{
-		if (ex_end.rd != 0)
-		{
-			cur_RD.rd = ex_end.rd;
-			cur_RD.rd_value = ex_end.result;
-		}
-		return;
-	}
+	
 
 };
 RD_Renew RD;
+void update(pass_oj &ex_end,RD_Renew &RD)
+{
+	switch (ex_end.inst_name)
+	{
+	case LB:case LH:case LW:case LBU:case LHU:break;
+	default:
+		if (ex_end.rd != 0)
+	{
+		RD.cur_RD.rd = ex_end.rd;
+		RD.cur_RD.rd_value = ex_end.result;
+	}
+		break;
+	}
+	
+	return;
+}
 
 int wait_time = 0;
 
@@ -357,10 +320,9 @@ public:
 		{
 		case ADD:case SUB:case SLT:case SLTU:case XOR:
 		case OR:case AND:case SLL:case SRL:case SRA:
-		case LB:case LH:case LW:case LBU:case LHU:
 		case ADDI:case SLTI:case SLTIU:case XORI:case ORI:
 		case ANDI:case SLLI:case SRLI:case SRAI:case JALR:
-		case LUI:case AUIPC:
+		case LUI:case AUIPC:case JAL:
 		{
 			if (WB_end.rd != 0)
 			{
@@ -371,6 +333,20 @@ public:
 		case BEQ:case BNE:case BLT:case BGE:case BLTU:case BGEU:
 		{
 			PC = WB_end.result;
+			break;
+		}
+		case LB:case LH:case LW:case LBU:case LHU:
+		{
+			if (WB_end.rd != 0)
+			{
+				reg.Register[WB_end.rd] = WB_end.result;
+			}
+			
+			if (RD.cur_RD.rd == WB_end.rd)
+			{
+				RD.cur_RD.rd = 0;
+				RD.cur_RD.rd_value = 0;
+			}
 			break;
 		}
 		default:break;
@@ -421,6 +397,7 @@ public:
 				im.Memery[MA_end.tmp + 2] = (tmp1 & 255);
 				tmp1 >>= 8;
 				im.Memery[MA_end.tmp + 3] = (tmp1 & 255);
+
 				break;
 			}
 			case LB:
@@ -441,11 +418,14 @@ public:
 			}
 			case LBU:
 			{
-				MA_end.result = ((uint32_t)im.Memery[MA_end.tmp]);
+
+				MA_end.result =((unsigned int)im.Memery[MA_end.tmp]);
+				break;
+
 			}
 			case LHU:
 			{
-				MA_end.result = ((uint32_t)(im.Memery[MA_end.tmp + 1] << 8) + (uint32_t)im.Memery[MA_end.tmp]);
+				MA_end.result = ((unsigned int)((im.Memery[MA_end.tmp + 1] << 8) + im.Memery[MA_end.tmp]));
 				break;
 			}
 			default: break;
@@ -462,78 +442,75 @@ public:
 	Execution() {};
 	~Execution() {};
 
-	pass_oj Ex(pass_oj execution_end)
+	pass_oj Ex(pass_oj execution_end, RD_Renew &RD)
 	{
-		if (execution_end.inst_name == ZERO)
-		{
-			return execution_end;
-		}
+		RD.Check_And_Renew(execution_end);
 		switch (execution_end.inst_name)
 		{
 		//R_Type 10*****
 		case ADD:
 		{
 			execution_end.result = execution_end.rs1_value + execution_end.rs2_value;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+
+			
 			break;
 		}
 		case SUB:
 		{
 			execution_end.result = execution_end.rs1_value - execution_end.rs2_value;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLT:
 		{
 			execution_end.result = (execution_end.rs1_value < execution_end.rs2_value) ? 1 : 0;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLTU:
 		{
 			execution_end.result = ((uint32_t)execution_end.rs1_value < (uint32_t)execution_end.rs2_value) ? 1 : 0;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case XOR:
 		{
 			execution_end.result = (execution_end.rs1_value ^ execution_end.rs2_value);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case OR:
 		{
 			execution_end.result = (execution_end.rs1_value | execution_end.rs2_value);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case AND:
 		{
 			execution_end.result = (execution_end.rs1_value & execution_end.rs2_value);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLL:
 		{
 			execution_end.tmp = (execution_end.rs2_value & 31u);
 			execution_end.result = (execution_end.rs1_value << execution_end.tmp);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SRL:
 		{
 			execution_end.tmp = (execution_end.rs2_value & 31u);
 			execution_end.result = ((uint32_t)execution_end.rs1_value >> execution_end.tmp);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 
 			break;
 		}
@@ -541,8 +518,8 @@ public:
 		{
 			execution_end.tmp = (execution_end.rs2_value & 31u);
 			execution_end.result = SignExtended((execution_end.rs1_value >> execution_end.tmp), 32 - execution_end.tmp);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 
@@ -551,9 +528,9 @@ public:
 		{
 			execution_end.result = (execution_end.rs1_value == execution_end.rs2_value) ?
 				(execution_end.jump_PC) : (execution_end.no_jump_PC);
-			execution_end.Real_PC = execution_end.result;
+			//execution_end.Real_PC = execution_end.result;
 			
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 
 			break;
 		}
@@ -562,7 +539,7 @@ public:
 			execution_end.result = (execution_end.rs1_value == execution_end.rs2_value) ?
 				(execution_end.no_jump_PC) : (execution_end.jump_PC);
 			
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 			break;
 		}
 		case BLT:
@@ -570,7 +547,7 @@ public:
 			execution_end.result = (execution_end.rs1_value < execution_end.rs2_value) ? 
 				(execution_end.jump_PC) : (execution_end.no_jump_PC);
 			
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 			break;
 		}
 		case BGE:
@@ -578,7 +555,7 @@ public:
 			execution_end.result = (execution_end.rs1_value >= execution_end.rs2_value) ? 
 				(execution_end.jump_PC) : (execution_end.no_jump_PC);
 			
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 			break;
 		}
 		case BLTU:
@@ -588,7 +565,7 @@ public:
 			execution_end.result = (tmp1 < tmp2) ?
 				(execution_end.jump_PC) : (execution_end.no_jump_PC);
 			
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 			break;
 		}
 		case BGEU:
@@ -598,7 +575,7 @@ public:
 			execution_end.result = (tmp1 >= tmp2) ?
 				(execution_end.jump_PC) : (execution_end.no_jump_PC);
 
-			PC = execution_end.Real_PC;
+			//PC = execution_end.Real_PC;
 			break;
 
 		}
@@ -617,12 +594,15 @@ public:
 		case SW:
 		{
 			execution_end.tmp = execution_end.rs1_value + execution_end.imm;
-			execution_end.result = (execution_end.rs2_value & 0xffffffff);
+			execution_end.result = (execution_end.rs2_value );
+
 			break;
 		}
 		//I_Type 16
 		case JAL:
 		{
+			execution_end.result = execution_end.cur_PC + 4;
+
 			break;
 		}
 		case JALR:
@@ -640,72 +620,73 @@ public:
 		case ADDI:
 		{
 			execution_end.result = (execution_end.rs1_value +execution_end.imm);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLTI:
 		{
 			execution_end.result = (execution_end.rs1_value < execution_end.imm)?1:0;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLTIU:
 		{
 			execution_end.result = ((uint32_t)execution_end.rs1_value < (uint32_t)execution_end.imm) ? 1 : 0;
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case XORI:
 		{
 			execution_end.result = (execution_end.rs1_value & execution_end.imm);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case ORI:
 		{
 			execution_end.result = (execution_end.rs1_value | execution_end.imm);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case ANDI:
 		{
 			execution_end.result = (execution_end.rs1_value & execution_end.imm);
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SLLI:
 		{
 			execution_end.result = (execution_end.rs1_value << (execution_end.shamt&31u));
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SRLI:
 		{
-			execution_end.result = (execution_end.rs1_value >> (execution_end.shamt & 31u));
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			uint32_t tmp = (uint32_t)execution_end.rs1_value;
+			execution_end.result = (tmp >> (execution_end.shamt & 31u));
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case SRAI:
 		{
 			execution_end.result = SignExtended(execution_end.rs1_value >> (execution_end.shamt & 31u), 32-(execution_end.shamt & 31u));
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		//U_Type 2******
 		case LUI:
 		{
 			execution_end.result = (execution_end.imm );
-			RD.cur_RD.rd = execution_end.rd;
-			RD.cur_RD.rd_value = execution_end.result;
+			//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			break;
 		}
 		case AUIPC:
@@ -715,8 +696,8 @@ public:
 				PC = execution_end.cur_PC + (execution_end.imm << 12);
 				execution_end.result = PC;
 
-				RD.cur_RD.rd = execution_end.rd;
-				RD.cur_RD.rd_value = execution_end.result;
+				//RD.cur_RD.rd = execution_end.rd;
+			//RD.cur_RD.rd_value = execution_end.result;
 			}
 
 		}
@@ -736,7 +717,7 @@ public:
 
 	unsigned int instruction = 0;
 	
-	pass_oj Decode(pass_oj decode_end)
+	pass_oj Decode(pass_oj decode_end, RD_Renew &RD)
 	{
 		if (decode_end.inst_name == ZERO)
 		{
@@ -745,25 +726,30 @@ public:
 
 		switch (decode_end.inst_name)
 		{
-		case ADD:case SUB:case SLT:case SLTU:case XOR:
-		case OR:case AND:case SLL:case SRL:case SRA:
+		case ADD:case SUB:case SLL:case SLT:case SLTU:
+		case XOR:case OR:case AND:case SRL:case SRA:
 		case BEQ:case BNE:case BLT:case BGE:
 		case BLTU:case BGEU:
 		case SB:case SH:case SW:
+			if (!decode_end.checked_rs1)
+			{
 				decode_end.rs1_value = reg.Register[decode_end.rs1];
-				decode_end.rs2_value = reg.Register[decode_end.rs2];
-				
+			}
+
+			if(!decode_end.checked_rs2)
+			decode_end.rs2_value = reg.Register[decode_end.rs2];
 			break;
 
 		case JALR:case LB:case LH:case LW:case LBU:case LHU:
 		case ADDI:case SLTI:case SLTIU:case XORI:case ORI:case ANDI:
 		case SLLI:case SRLI:case SRAI:
+			if(!decode_end.checked_rs1)
 				decode_end.rs1_value = reg.Register[decode_end.rs1];
 			
 			break;
 		default :break;
 		}
-
+		RD.Check_And_Renew(decode_end);
 		return decode_end;
 	}
 
@@ -810,8 +796,8 @@ public:
 		pass_oj fetch_end;
 		fetch_end.cur_PC = PC - 4;
 		fetch_end.rd = rd;
-		fetch_end.rd = rs1;
-		fetch_end.rd = rs2;
+		fetch_end.rs1 = rs1;
+		fetch_end.rs2 = rs2;
 
 		if (func3 == 0)
 		{
@@ -835,23 +821,23 @@ public:
 	{
 		unsigned int tmp = instruction;
 
-		unsigned int opcode = (tmp & 127);
+		int opcode = (tmp & 127);
 		tmp = (tmp >> 7);
 		pass_oj fetch_end ;
 		fetch_end.cur_PC = PC - 4;
 
 		if (opcode == 3)
 		{
-			unsigned int rd = (tmp & 31);
+			int rd = (tmp & 31);
 			tmp >>= 5;
 
-			unsigned int func3 = (tmp & 7);
+		    int func3 = (tmp & 7);
 			tmp >>= 3;
 
 			unsigned int rs1 = (tmp & 31);
 			tmp >>= 5;
 
-			unsigned int imm1 = (tmp&(4095));
+			int imm1 = (tmp&(4095));
 			int imm = SignExtended(imm1, 12);
 			
 			fetch_end.rd = rd;
@@ -871,18 +857,18 @@ public:
 		}
 		else if (opcode == 19)
 		{
-			unsigned int rd = (tmp & 31);
+			int rd = (tmp & 31);
 			tmp >>= 5;
 
-			unsigned int func3 = (tmp & 7);
+			int func3 = (tmp & 7);
 			tmp >>= 3;
 
-			unsigned int rs1 = (tmp & 31);
+			int rs1 = (tmp & 31);
 			tmp >>= 5;
 
 			if (func3 == 0)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				
 				fetch_end.imm = imm;
@@ -892,7 +878,7 @@ public:
 			}
 			else if (func3 == 2)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				fetch_end.imm = imm;
 				fetch_end.rs1 = rs1;
@@ -901,7 +887,7 @@ public:
 			}
 			else if (func3 == 3)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				fetch_end.imm = imm;
 				fetch_end.rs1 = rs1;
@@ -910,7 +896,7 @@ public:
 			}
 			else if (func3 == 4)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				fetch_end.imm = imm;
 				fetch_end.rs1 = rs1;
@@ -919,7 +905,7 @@ public:
 			}
 			else if (func3 == 6)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				fetch_end.imm = imm;
 				fetch_end.rs1 = rs1;
@@ -928,7 +914,7 @@ public:
 			}
 			else if (func3 == 7)
 			{
-				unsigned int imm1 = (tmp & 4095);
+				int imm1 = (tmp & 4095);
 				int imm = SignExtended(imm1, 12);
 				fetch_end.imm = imm;
 				fetch_end.rs1 = rs1;
@@ -937,7 +923,7 @@ public:
 			}
 			else
 			{
-				unsigned int shamt1 = (tmp & 31);
+				int shamt1 = (tmp & 31);
 				int shamt = SignExtended(shamt1, 5);
 				tmp >>= 5;
 				int func7 = (tmp & 127);
@@ -968,16 +954,16 @@ public:
 		}
 		else if (opcode == 111)
 		{
-			unsigned int rd = (tmp & 31);
+			int rd = (tmp & 31);
 			tmp >>= 5;
-			unsigned int imm1 = (tmp & 255);
+			int imm1 = (tmp & 255);
 			tmp >>= 8;
-			unsigned int imm2 = (tmp & 1);
+			int imm2 = (tmp & 1);
 			tmp >>= 1;
-			unsigned int imm3 = (tmp & 1023);
+			int imm3 = (tmp & 1023);
 			tmp >>= 10;
-			unsigned int imm4 = (tmp & 1);
-			unsigned int imm0 = 0;
+			int imm4 = (tmp & 1);
+			int imm0 = 0;
 			imm0 += (imm4 << 20);
 			imm0 += (imm3 << 1);
 			imm0 += (imm2 << 11);
@@ -988,20 +974,17 @@ public:
 			fetch_end.imm = imm;
 			fetch_end.inst_name = JAL;
 
-			fetch_end.result = fetch_end.cur_PC + 4;
-
-			reg.Register[fetch_end.rd] = fetch_end.result;
-
+			wait_time = 4;
 			PC = fetch_end.cur_PC + fetch_end.imm;
 		}
 		else
 		{
-			unsigned int rd = (tmp & 31);
+			int rd = (tmp & 31);
 			tmp >>= 5;
 			tmp >>= 3;
-			unsigned int rs1 = (tmp & 31);
+			int rs1 = (tmp & 31);
 			tmp >>= 5;
-			unsigned int imm1 = (tmp & 4095);
+			int imm1 = (tmp & 4095);
 			int imm = SignExtended(imm1, 12);
 
 			wait_time = 4;
@@ -1016,10 +999,10 @@ public:
 	pass_oj U_()
 	{
 		unsigned int tmp = instruction;
-		unsigned int opcode = (tmp & 127);
+		int opcode = (tmp & 127);
 		tmp >>= 7;
 
-		unsigned int rd = (tmp & 31);
+		int rd = (tmp & 31);
 		tmp >>= 5;
 
 		int imm = (((tmp & 0xfffff) << 12)&(0xffffffff >> 12 << 12));
@@ -1045,20 +1028,20 @@ public:
 	};
 	pass_oj S_()
 	{
-		unsigned int tmp = instruction;
-		unsigned int opcode = (tmp & 127);
+		int tmp = instruction;
+		int opcode = (tmp & 127);
 		tmp >>= 7;
 
 		unsigned int imm1 = (tmp & 31);
 		tmp >>= 5;
 
-		unsigned int func3 = (tmp & 7);
+		int func3 = (tmp & 7);
 		tmp >>= 3;
 
-		unsigned int rs1 = (tmp & 31);
+		int rs1 = (tmp & 31);
 		tmp >>= 5;
 
-		unsigned int rs2 = (tmp & 31);
+		int rs2 = (tmp & 31);
 		tmp >>= 5;
 
 		unsigned int imm2 = (tmp & 127);
@@ -1067,7 +1050,7 @@ public:
 		fetch_end.cur_PC = PC - 4;
 		if (opcode == 99)
 		{
-			unsigned int imm0 = 0;
+			int imm0 = 0;
 			imm0 += ((imm1 & 1) << 11);
 			imm1 >>= 1;
 			imm0 += ((imm1 & 15) << 1);
@@ -1084,9 +1067,9 @@ public:
 			//分支预测
 			fetch_end.jump_PC = fetch_end.cur_PC + fetch_end.imm;
 			fetch_end.no_jump_PC = fetch_end.cur_PC + 4;
-			PC = Guess(fetch_end.jump_PC, fetch_end.no_jump_PC);
-			fetch_end.Pred_PC = PC;
-
+			//PC = Guess(fetch_end.jump_PC, fetch_end.no_jump_PC);
+			//fetch_end.Pred_PC = PC;
+			wait_time = 4;
 			switch (func3)
 			{
 			case 0:fetch_end.inst_name = BEQ; break;
@@ -1100,7 +1083,7 @@ public:
 		}
 		else
 		{
-			unsigned int imm0 = 0;
+			int imm0 = 0;
 			imm0 += (imm1 & 31);
 			imm0 += ((imm2 & 127) << 5);
 			int imm = SignExtended(imm0, 12);
@@ -1119,8 +1102,9 @@ public:
 		return fetch_end;
 	};
 
-	pass_oj fetcher(InterMem &im)
+	pass_oj fetcher(InterMem &im, RD_Renew &RD)
 	{
+		//wait_time = 4;
 		pass_oj fetch_end;
 		Fetch(im);
 		fetch_end.opcode = (instruction & 127);
@@ -1132,6 +1116,7 @@ public:
 		case 99:case 35:fetch_end = S_(); break;
 		case 55:case 23:fetch_end = U_(); break;
 		}	
+		RD.Check_And_Renew(fetch_end);
 		return fetch_end;
 	}
 };
