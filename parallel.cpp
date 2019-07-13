@@ -33,13 +33,13 @@ int main()
 		strcpy(Name[36], "AND"); strcpy(Name[37], "ZERO");
 	}
 
-	freopen("naive.data", "r", stdin);
+	//freopen("naive.data", "r", stdin);
 	im.readin();
 	int cnt = 1;
-	//交接结构
+	//陆禄陆脫陆谩鹿鹿
 	pass_oj if_end, id_end, ex_end, ma_end;
 
-	//五级流水
+	//脦氓录露脕梅脣庐
 	while (1)
 	{
 
@@ -68,16 +68,16 @@ int main()
 		update(ex_end, RD);
 		RD.Check_And_Renew(if_end);
 
-		cout << cnt << " " << PC << " ";
+		//cout << cnt << " " << PC << " ";
 		//cout << cnt << "*******" <<"PC: "<<PC<< endl;
-		cout << "rd:  " << RD.cur_RD.rd << "    rd_value:   " << RD.cur_RD.rd_value << endl;
-		cout << "Name: "<<Name[if_end.inst_name]<< "   " << "cur_PC:"<<if_end.cur_PC << "   ***IF "<<endl;
+		//cout << "rd:  " << RD.cur_RD.rd << "    rd_value:   " << RD.cur_RD.rd_value << endl;
+		//cout << "Name: "<<Name[if_end.inst_name]<< "   " << "cur_PC:"<<if_end.cur_PC << "   ***IF "<<endl;
 
-		cout << "Name: " << Name[id_end.inst_name] << "   " << "cur_PC:" << id_end.cur_PC << "   ***ID " << endl;
+		//cout << "Name: " << Name[id_end.inst_name] << "   " << "cur_PC:" << id_end.cur_PC << "   ***ID " << endl;
 
-		cout << "Name: " << Name[ex_end.inst_name] << "   " << "cur_PC:" << ex_end.cur_PC << "   ***EX " << endl;
+		//cout << "Name: " << Name[ex_end.inst_name] << "   " << "cur_PC:" << ex_end.cur_PC << "   ***EX " << endl;
 
-		cout << "Name: " << Name[ma_end.inst_name] << "   " << "cur_PC:" << ma_end.cur_PC << "   ***MA " << endl;
+		/cout << "Name: " << Name[ma_end.inst_name] << "   " << "cur_PC:" << ma_end.cur_PC << "   ***MA " << endl;
 
 
 
