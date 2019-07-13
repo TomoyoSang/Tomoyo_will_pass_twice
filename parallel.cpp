@@ -10,7 +10,7 @@ Write_Back my_wb;
 
 int main()
 {
-	char Name[37][10];
+	/*char Name[38][10];
 	{
 		strcpy(Name[0], "LUI"); strcpy(Name[1], "AUIPC");
 		strcpy(Name[2], "JAL"); strcpy(Name[3], "JALR");
@@ -31,7 +31,7 @@ int main()
 		strcpy(Name[32], "XOR"); strcpy(Name[33], "SRL");
 		strcpy(Name[34], "SRA"); strcpy(Name[35], "OR");
 		strcpy(Name[36], "AND"); strcpy(Name[37], "ZERO");
-	}
+	}*/
 
 	//freopen("naive.data", "r", stdin);
 	im.readin();
