@@ -77,13 +77,13 @@ int main()
 
 		//cout << "Name: " << Name[ex_end.inst_name] << "   " << "cur_PC:" << ex_end.cur_PC << "   ***EX " << endl;
 
-		/cout << "Name: " << Name[ma_end.inst_name] << "   " << "cur_PC:" << ma_end.cur_PC << "   ***MA " << endl;
+		//cout << "Name: " << Name[ma_end.inst_name] << "   " << "cur_PC:" << ma_end.cur_PC << "   ***MA " << endl;
 
 
 
-		for (int i = 1; i <= 31; ++i)
-			cout << reg.Register[i] << " ";
-		cout << endl;
+		//for (int i = 1; i <= 31; ++i)
+			//cout << reg.Register[i] << " ";
+		//cout << endl;
 
 
 
